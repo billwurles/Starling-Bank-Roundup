@@ -5,13 +5,12 @@ import burles.will.roundup.data.bank.Account;
 import burles.will.roundup.starling.StarlingAPIClient;
 import burles.will.roundup.starling.api.response.GetSavingsGoalResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 
 @RequiredArgsConstructor
 @RestController
@@ -24,7 +23,7 @@ public class ApiController {
 
 	@GetMapping("/account")
 	public Mono<Account> getAccount() {
-		return client.getAccountFromStarlingAPI();
+		return client.getAccountFromStarlingAPI(LocalDate.now().minusDays(7));
 	}
 
 	@GetMapping("/account/{accountUid}/savings-goal/{goalUid}")
@@ -33,8 +32,15 @@ public class ApiController {
 	}
 
 	@GetMapping("/roundup")
-	public Mono<ResponseEntity<RoundUpResponse>> roundUpTransactions(){
-		return client.getAccountFromStarlingAPI() // Retrieve the account information: UID, balance & transactions
+	public Mono<ResponseEntity<RoundUpResponse>> roundUpTransactions(@RequestParam("from") String weekBeginning){
+		LocalDate weekBeginningDate;
+		try {
+			weekBeginningDate = LocalDate.parse(weekBeginning);
+		} catch (DateTimeParseException e){
+			return handleRoundUpError(400, "Error: Invalid Request", "Invalid start date submitted in request, submit a query parameter in the format /api/roundup?from=yyyy-MM-dd");
+		}
+
+		return client.getAccountFromStarlingAPI(weekBeginningDate) // Retrieve the account information: UID, balance & transactions
 
 				.flatMap(account -> {
 					long value = account.roundUpPayments(); // Get the value of rounding up the outgoing transactions
@@ -66,7 +72,7 @@ public class ApiController {
 								))));
 							} else {
 								return handleRoundUpError( // In case the server sends back an unsuccessful response, throw an error
-										501,
+										502,
 										"Error: Round Up Unsuccessful",
 										"Attempt to add roundups to savings goal was unsuccessful"
 								);
@@ -75,14 +81,14 @@ public class ApiController {
 				})
 				.onErrorResume(e -> handleRoundUpError( // If any errors occur in the process, display the relevant error
 						500,
-						"An error occurred during the roundup process",
+						"Error: Round Up Failure",
 						e.getMessage()
 				));
 	}
 
 	public Mono<ResponseEntity<RoundUpResponse>> handleRoundUpError(int code, String message, String body){ // Method to format errors for display
 		return Mono.just(
-				ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+				ResponseEntity.status(code)
 						.body(new RoundUpResponse(
 								new RoundUpResponse.Error(
 										code, message, body)

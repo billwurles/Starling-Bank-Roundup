@@ -35,14 +35,13 @@ public class StarlingAPIClient {
 	private static final String savingsUri = "/savings-goals/";
 	private static final String addSavingsUri = "/add-money/";
 
-	public Mono<Account> getAccountFromStarlingAPI(){ // Gets the required account details by running the other API calls
+	public Mono<Account> getAccountFromStarlingAPI(LocalDate transactionsFrom){ // Gets the required account details by running the other API calls
 		log.debug("Getting account from Starling API");
 		return getAccount().flatMap(// Makes a request to the API for the Account details
 				acc -> {
 					String uid = acc.getAccounts().get(0).getAccountUid();
-					LocalDate now = LocalDate.now();
-					LocalDate weekAgo = now.minusDays(7);
-					Mono<String> transactionCall = getTransactionsInRange(uid, weekAgo, now); // Gets transactions for the last 7 days
+					LocalDate to = transactionsFrom.plusDays(7);
+					Mono<String> transactionCall = getTransactionsInRange(uid, transactionsFrom, to); // Gets transactions for 7 days from the start date
 					Mono<GetBalanceResponse> balanceCall = getBalance(uid); // Using the account UID two async API calls are made for balance and transaction data
 
 					return Mono.zip(balanceCall, transactionCall, (balResp, tranResp) ->

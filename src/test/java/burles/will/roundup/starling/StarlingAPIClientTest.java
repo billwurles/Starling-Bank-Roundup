@@ -38,7 +38,7 @@ class StarlingAPIClientTest {
 
 	@Test
 	void getAccountFromStarlingAPI() {
-		Mono<Account> accountResp = client.getAccountFromStarlingAPI();
+		Mono<Account> accountResp = client.getAccountFromStarlingAPI(LocalDate.parse("2025-03-01"));
 		Account acc = accountResp.block();
 		assert acc != null;
 		System.out.println(acc.toString());
